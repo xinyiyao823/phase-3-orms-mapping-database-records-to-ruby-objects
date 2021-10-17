@@ -8,6 +8,22 @@ class Song
     @album = album
   end
 
+  def save
+    sql = <<-SQL
+      INSERT INTO songs (name, album)
+      VALUES (?, ?)
+    SQL
+
+    # insert the song
+    DB[:conn].execute(sql, self.name, self.album)
+
+    # get the song ID from the database and save it to the Ruby instance
+    self.id = DB[:conn].execute("SELECT last_insert_rowid() FROM songs")[0][0]
+
+    # return the Ruby instance
+    self
+  end
+  
   def self.drop_table
     sql = <<-SQL
       DROP TABLE IF EXISTS songs
@@ -28,20 +44,12 @@ class Song
     DB[:conn].execute(sql)
   end
 
-  def save
+  def self.drop_table
     sql = <<-SQL
-      INSERT INTO songs (name, album)
-      VALUES (?, ?)
+      DROP TABLE songs;
     SQL
 
-    # insert the song
-    DB[:conn].execute(sql, self.name, self.album)
-
-    # get the song ID from the database and save it to the Ruby instance
-    self.id = DB[:conn].execute("SELECT last_insert_rowid() FROM songs")[0][0]
-
-    # return the Ruby instance
-    self
+    DB[:conn].execute(sql)
   end
 
   def self.create(name:, album:)
@@ -49,4 +57,33 @@ class Song
     song.save
   end
 
+  def self.new_from_db(row)
+    # self.new is equivalent to Song.new
+    self.new(id: row[0], name: row[1], album: row[2])
+  end
+
+  def self.all
+    sql = <<-SQL
+      SELECT *
+      FROM songs
+    SQL
+
+    DB[:conn].execute(sql).map do |row|
+      self.new_from_db(row)
+    end
+  end
+
+  def self.find_by_name(name)
+    sql = <<-SQL
+      SELECT *
+      FROM songs
+      WHERE name = ?
+      LIMIT 1
+    SQL
+
+    DB[:conn].execute(sql, name).map do |row|
+      self.new_from_db(row)
+    end.first
+  end
+  
 end
